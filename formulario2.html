@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Informe Técnico Pro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        /* Estilos manuales para evitar errores de librerías externas */
+        body { font-family: Arial, sans-serif; background-color: #f3f4f6; padding: 20px; color: #333; }
+        .card { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        h1 { border-bottom: 2px solid #2563eb; padding-bottom: 10px; color: #1e40af; }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+        label { display: block; font-weight: bold; margin-bottom: 5px; font-size: 14px; }
+        input, textarea { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; }
+        button { background-color: #2563eb; color: white; padding: 12px 25px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 16px; float: right; }
+        button:hover { background-color: #1e40af; }
+        .preview-img { width: 100%; height: 200px; object-fit: cover; border-radius: 5px; border: 1px solid #ddd; margin-top: 10px; }
+        
+        /* Estilo del Informe (El que se convierte a PDF) */
+        #informe-final { width: 700px; padding: 40px; background: white; position: absolute; left: -9999px; }
+        .tabla-pdf { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        .tabla-pdf td { border: 1px solid #333; padding: 10px; }
+        .header-pdf { border-bottom: 3px solid #2563eb; margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>📋 Registro Técnico</h1>
+        
+        <div class="grid">
+            <div>
+                <label>Proyecto</label>
+                <input type="text" id="proyecto" placeholder="Nombre del proyecto">
+            </div>
+            <div>
+                <label>Técnico</label>
+                <input type="text" id="tecnico" placeholder="Tu nombre">
+            </div>
+            <div>
+                <label>Fecha</label>
+                <input type="date" id="fecha">
+            </div>
+            <div>
+                <label>Código REF</label>
+                <input type="text" id="codigo" placeholder="Ej: 123456">
+            </div>
+        </div>
+
+        <label>Observaciones</label>
+        <textarea id="observaciones" rows="4"></textarea>
+
+        <div style="margin-top:20px;">
+            <label>Fotos (Máx 2)</label>
+            <input type="file" id="inputFotos" accept="image/*" multiple>
+            <div id="visualPrevia" class="grid" style="margin-top:10px;"></div>
+        </div>
+
+        <button onclick="generarPDF()">💾 Generar Informe PDF</button>
+        <div style="clear:both;"></div>
+    </div>
+
+    <div id="informe-final">
+        <div class="header-pdf">
+            <h2 style="margin:0;">INFORME TÉCNICO DE INSPECCIÓN</h2>
+            <p id="pdf-ref-fecha" style="color:#666;"></p>
+        </div>
+
+        <table class="tabla-pdf">
+            <tr>
+                <td style="background:#eee; font-weight:bold; width:30%;">Proyecto:</td>
+                <td id="pdf-proyecto"></td>
+            </tr>
+            <tr>
+                <td style="background:#eee; font-weight:bold;">Realizado por:</td>
+                <td id="pdf-tecnico"></td>
+            </tr>
+        </table>
+
+        <h3 style="color:#2563eb; border-bottom:1px solid #ddd; margin-top:30px;">Descripción Técnica</h3>
+        <p id="pdf-obs" style="line-height:1.6; text-align:justify;"></p>
+
+        <h3 style="color:#2563eb; border-bottom:1px solid #ddd; margin-top:30px;">Evidencia Fotográfica</h3>
+        <div id="pdf-fotos" class="grid"></div>
+    </div>
+
+    <script>
+        let fotosBase64 = [];
+
+        // Leer fotos
+        document.getElementById('inputFotos').addEventListener('change', function(e) {
+            const preview = document.getElementById('visualPrevia');
+            preview.innerHTML = '';
+            fotosBase64 = [];
+            
+            Array.from(e.target.files).slice(0, 2).forEach(file => {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const img = document.createElement('img');
+                    img.src = event.target.result;
+                    img.className = "preview-img";
+                    preview.appendChild(img);
+                    fotosBase64.push(event.target.result);
+                };
+                reader.readAsDataURL(file);
+            });
+        });
+
+        async function generarPDF() {
+            // Llenar datos en la plantilla
+            document.getElementById('pdf-proyecto').innerText = document.getElementById('proyecto').value || '---';
+            document.getElementById('pdf-tecnico').innerText = document.getElementById('tecnico').value || '---';
+            document.getElementById('pdf-obs').innerText = document.getElementById('observaciones').value || 'Sin observaciones.';
+            document.getElementById('pdf-ref-fecha').innerText = `Ref: ${document.getElementById('codigo').value} | Fecha: ${document.getElementById('fecha').value}`;
+
+            const contenedorFotos = document.getElementById('pdf-fotos');
+            contenedorFotos.innerHTML = '';
+            fotosBase64.forEach(src => {
+                const img = document.createElement('img');
+                img.src = src;
+                img.style.width = "100%";
+                img.style.borderRadius = "5px";
+                contenedorFotos.appendChild(img);
+            });
+
+            // Crear el PDF
+            const elemento = document.getElementById('informe-final');
+            
+            // Usamos una pequeña pausa para asegurar que las fotos carguen
+            setTimeout(() => {
+                html2canvas(elemento, { scale: 2 }).then(canvas => {
+                    const imgData = canvas.toDataURL('image/png');
+                    const { jsPDF } = window.jspdf;
+                    const pdf = new jsPDF('p', 'mm', 'a4');
+                    
+                    const imgProps = pdf.getImageProperties(imgData);
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                    
+                    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+                    pdf.save("Informe_Tecnico.pdf");
+                });
+            }, 500);
+        }
+    </script>
+</body>
+</html>
